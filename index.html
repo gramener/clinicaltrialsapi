@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clinical Trials API Agent</title>
+  <link rel="icon" href="https://raw.githubusercontent.com/gramener/assets/main/straive-favicon.svg">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" crossorigin="anonymous">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
+  <style>
+    .narrative {
+      max-width: 40rem;
+    }
+
+    .pre-wrap {
+      white-space: pre-wrap;
+    }
+
+    #summary details {
+      margin-bottom: 1.5rem;
+    }
+  </style>
+</head>
+
+<body>
+
+  <nav class="navbar navbar-expand-lg bg-body-tertiary" data-bs-theme="dark">
+    <div class="container-fluid">
+      <a class="navbar-brand" href=".">Clinical Trials API Agent</a>
+      <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarSupportedContent" aria-controls="navbarSupportedContent" aria-expanded="false" aria-label="Toggle navigation">
+        <span class="navbar-toggler-icon"></span>
+      </button>
+      <div class="collapse navbar-collapse" id="navbarSupportedContent">
+        <div class="nav-item dropdown ms-auto" role="group" aria-label="Toggle dark mode" title="Toggle Dark Mode">
+          <button class="dark-theme-toggle btn btn-outline-light dropdown-toggle" type="button" data-bs-toggle="dropdown" aria-expanded="false" aria-label="Toggle theme (auto)">
+            <i class="bi bi-circle-half"></i> <span class="d-lg-none ms-2">Toggle theme</span>
+          </button>
+          <ul class="dropdown-menu dropdown-menu-end">
+            <li><button class="dropdown-item" data-bs-theme-value="light"><i class="me-2 bi bi-sun-fill"></i> Light</button></li>
+            <li><button class="dropdown-item" data-bs-theme-value="dark"><i class="me-2 bi bi-moon-stars-fill"></i> Dark</button></li>
+            <li><button class="dropdown-item" data-bs-theme-value="auto"><i class="me-2 bi bi-circle-half"></i> Auto</button></li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </nav>
+
+  <div class="container">
+    <h1 class="display-1 my-4 text-center">Clinical Trials API Agent</h1>
+    <h2 class="display-6 text-center">Answer questions from the <a href="https://www.clinicaltrials.gov/data-api/api">ClinicalTrials.gov API</a></h2>
+    <div class="mx-auto my-3 narrative">
+      <p>This application is designed for the Clinical Trials API Agent, allowing users to answer questions based on the <a href="https://www.clinicaltrials.gov/data-api/api">ClinicalTrials.gov API</a>.</p>
+      <p>Enter a question below. The agent will:</p>
+      <ul>
+        <li>Convert the question into a structured query</li>
+        <li>Fetch the relevant studies from the ClinicalTrials.gov API</li>
+        <li>Show the summary of these studies</li>
+        <li>Create a plan to answer the question using the data</li>
+        <li>Present a final answer, citing studies to support the answer</li>
+      </ul>
+    </div>
+
+    <form id="query-form" class="d-flex gap-2">
+      <div class="flex-grow-1">
+        <input type="text" class="form-control" id="query" placeholder="Enter your question here" aria-label="Question" list="sample-questions">
+        <datalist id="sample-questions">
+          <option value="What are inclusion-exclusion criteria for a diabetes trial on 65+ patients?">
+          <option value="What are primary and secondary outcomes for breast cancer patients?">
+          <option value="Which interventions are being tested in 50+ Alzheimer's patients?">
+          <option value="What are the eligibility criteria for pediatric asthma trials?">
+          <option value="What is the average duration of depression medications trials?">
+        </datalist>
+      </div>
+      <button type="submit" class="btn btn-primary">Submit</button>
+    </form>
+
+    <div id="search-params" class="my-3 table-responsive"></div>
+    <div id="error" class="narrative mx-auto my-5"></div>
+    <div id="summary" class="narrative mx-auto my-5"></div>
+  </div>
+
+  <div class="container-fluid">
+    <div id="search-documents" class="my-3 table-responsive"></div>
+  </div>
+
+  <footer class="my-5 vh-100 d-flex align-items-center justify-content-center">
+    <h1 class="display-4">Designed by <a href="https://gramener.com/" class="text-reset link-offset-3 link-underline link-underline-opacity-25">Gramener</a></h1>
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js" type="module"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@gramex/ui@0.3/dist/dark-theme.js" type="module"></script>
+  <script src="script.js" type="module"></script>
+</body>
+
+</html>
