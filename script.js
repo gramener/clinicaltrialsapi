@@ -34,7 +34,15 @@ $queryForm.addEventListener("submit", async (e) => {
       model: "gpt-4o-mini",
       stream: true,
       messages: [
-        { role: "system", content: "Find studies that will have the most relevant answers to the user question" },
+        {
+          role: "system",
+          content: `
+Find studies that will have the most relevant answers to the user question.
+In query.*, don't use phrases as-is. Always identify the most relevant keywords, combining them with AND.
+E.g. "violation by the FDA" becomes "violation AND FDA".
+E.g. "improper adherence to safety and scientific integrity" becomes "adherence AND safety AND integrity"
+`.trim(),
+        },
         { role: "user", content: query },
       ],
       tools: [{ type: "function", function: tools.studies }],

@@ -30,7 +30,7 @@ export const api = {
 export const tools = {
   studies: {
     name: "studies",
-    description: "Search clinical trials with filters. Use AND, OR, NOT, and parentheses for grouping.",
+    description: "Search clinical trials with filters.",
     parameters: {
       type: "object",
       required: ["fields"],
@@ -38,7 +38,7 @@ export const tools = {
         "query.cond": { type: "string", description: "Search for condition or disease" },
         "query.term": {
           type: "string",
-          description: "Search other terms like age, phase, design, sponsor, keyword, etc.",
+          description: 'Search age, phase, design, sponsor, keyword, etc.',
         },
         "query.locn": { type: "string", description: "Search for location (country, state, city, facility)" },
         "query.titles": { type: "string", description: "Search in title" },
