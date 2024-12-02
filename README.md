@@ -28,6 +28,10 @@ An interactive web application that helps users query and analyze data from the 
 - "What are the eligibility criteria for pediatric asthma trials?"
 - "What is the average duration of depression medications trials?"
 
+## Screenshot
+
+![Screenshot](screenshot.png)
+
 ## Installation
 
 ### Prerequisites
