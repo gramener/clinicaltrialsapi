@@ -61,27 +61,76 @@
       </ul>
     </div>
 
+    <div id="demos" class="row row-cols-1 row-cols-sm-2 row-cols-lg-3 row-cols-xl-4 my-5">
+      <div class="col py-3">
+        <div class="card h-100">
+          <div class="card-header">
+            <h5 class="card-title">Post launch monitoring</h5>
+          </div>
+          <div class="list-group list-group-flush">
+            <a href="#" class="list-group-item list-group-item-action demo">How do adverse event profiles compare between pre-launch trials and post-launch surveillance for Gilenya in multiple sclerosis patients?</a>
+            <a href="#" class="list-group-item list-group-item-action demo">What real-world evidence supports sustained efficacy in follow-up studies of Cosentyx for psoriasis and psoriatic arthritis?</a>
+          </div>
+        </div>
+      </div>
+      <div class="col py-3">
+        <div class="card h-100">
+          <div class="card-header">
+            <h5 class="card-title">Sales messaging</h5>
+          </div>
+          <div class="list-group list-group-flush">
+            <a href="#" class="list-group-item list-group-item-action demo">Which clinical endpoints from recent Kisqali trials best substantiate its efficacy in hormone receptor–positive advanced breast cancer compared to Pfizer's Ibrance?</a>
+            <a href="#" class="list-group-item list-group-item-action demo">What statistically significant patient outcomes from Zolgensma trials can be leveraged in sales narratives to highlight its benefits over Biogen's Spinraza in spinal muscular atrophy?</a>
+          </div>
+        </div>
+      </div>
+      <div class="col py-3">
+        <div class="card h-100">
+          <div class="card-header">
+            <h5 class="card-title">Promotional campaigns</h5>
+          </div>
+          <div class="list-group list-group-flush">
+            <a href="#" class="list-group-item list-group-item-action demo">Which quality-of-life improvements highlighted in Entresto studies support promotional claims for chronic heart failure therapy?</a>
+            <a href="#" class="list-group-item list-group-item-action demo">What innovative endpoints from Cosentyx studies can be used to craft engaging promotional content for psoriasis and psoriatic arthritis?</a>
+            <a href="#" class="list-group-item list-group-item-action demo">What unique patient-reported outcomes from Kisqali trials can differentiate its role in advanced breast cancer promotional materials?</a>
+          </div>
+        </div>
+      </div>
+      <div class="col py-3">
+        <div class="card h-100">
+          <div class="card-header">
+            <h5 class="card-title">Personalized marketing</h5>
+          </div>
+          <div class="list-group list-group-flush">
+            <a href="#" class="list-group-item list-group-item-action demo">What demographic-specific outcomes in Kisqali trials can inform personalized marketing strategies for hormone receptor–positive advanced breast cancer patients?</a>
+            <a href="#" class="list-group-item list-group-item-action demo">How do subgroup analyses in Gilenya studies help tailor messages for multiple sclerosis patients across different age groups?</a>
+            <a href="#" class="list-group-item list-group-item-action demo">Which biomarker-based efficacy results from Entresto trials can support individualized treatment marketing strategies for chronic heart failure patients?</a>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <form id="query-form" class="d-flex gap-2">
       <div class="flex-grow-1">
-        <input type="text" class="form-control" id="query" placeholder="Enter your question here" aria-label="Question" list="sample-questions">
-        <datalist id="sample-questions">
-          <option value="What are inclusion-exclusion criteria for a diabetes trial on 65+ patients?">
-          <option value="What are primary and secondary outcomes for breast cancer patients?">
-          <option value="Which interventions are being tested in 50+ Alzheimer's patients?">
-          <option value="What are the eligibility criteria for pediatric asthma trials?">
-          <option value="What is the average duration of depression medications trials?">
-        </datalist>
+        <input type="text" class="form-control" id="query" placeholder="Enter your question here" aria-label="Question">
       </div>
       <button type="submit" class="btn btn-primary">Submit</button>
     </form>
 
     <div id="search-params" class="my-3 table-responsive"></div>
     <div id="error" class="narrative mx-auto my-5"></div>
-    <div id="summary" class="narrative mx-auto my-5"></div>
   </div>
 
-  <div class="container-fluid">
-    <div id="search-documents" class="my-3 table-responsive"></div>
+  <div class="container">
+    <div class="row">
+      <div class="col-md-6">
+        <div id="network" class="my-3"></div>
+        <div id="summary" class="my-3"></div>
+      </div>
+      <div class="col-md-6">
+        <div id="search-documents" class="my-3 table-responsive"></div>
+      </div>
+    </div>
   </div>
 
   <div id="screenshot" class="container text-center">

@@ -17,7 +17,7 @@ function addFields(params) {
 }
 
 export const api = {
-  studies: (params) => run("/studies", { pageSize: 10, ...addFields(params) }),
+  studies: (params) => run("/studies", { pageSize: 50, ...addFields(params) }),
   study: ({ nctId }) => run(`/studies/${nctId}`),
   studiesMetadata: () => run("/studies/metadata"),
   studiesSearchAreas: () => run("/studies/search-areas"),
@@ -38,7 +38,7 @@ export const tools = {
         "query.cond": { type: "string", description: "Search for condition or disease" },
         "query.term": {
           type: "string",
-          description: 'Search age, phase, design, sponsor, keyword, etc.',
+          description: "Search age, phase, design, sponsor, keyword, etc.",
         },
         "query.locn": { type: "string", description: "Search for location (country, state, city, facility)" },
         "query.titles": { type: "string", description: "Search in title" },
@@ -106,6 +106,7 @@ export const tools = {
               "protocolSection.descriptionModule",
               "protocolSection.designModule",
               "protocolSection.eligibilityModule",
+              "protocolSection.outcomesModule",
               "protocolSection.ipdSharingStatementModule",
             ],
           },
