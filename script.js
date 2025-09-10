@@ -6,6 +6,7 @@ import * as d3 from "https://cdn.jsdelivr.net/npm/d3@7/+esm";
 import { network } from "https://cdn.jsdelivr.net/npm/@gramex/network@2";
 import { parse } from "https://cdn.jsdelivr.net/npm/partial-json@0.1.7/+esm";
 import { api, tools } from "./clinicaltrials.js";
+import { openaiConfig } from "https://cdn.jsdelivr.net/npm/bootstrap-llm-provider@1.2";
 
 const $queryForm = document.getElementById("query-form");
 const $query = document.getElementById("query");
@@ -14,6 +15,10 @@ const $error = document.getElementById("error");
 const $network = document.getElementById("network");
 const $summary = document.getElementById("summary");
 const $searchDocuments = document.getElementById("search-documents");
+const $apiSubtitle = document.getElementById("api-subtitle");
+const $clinicalTrialsDescription = document.getElementById("clinical-trials-description");
+const $openfdaDescription = document.getElementById("openfda-description");
+
 const spinner = (text) => html`<div class="alert alert-info narrative mx-auto d-flex align-items-center">
   <div class="spinner-border text-primary ms-2" role="status">
     <span class="visually-hidden">Loading...</span>
@@ -21,7 +26,9 @@ const spinner = (text) => html`<div class="alert alert-info narrative mx-auto d-
   <span class="ms-2">${text}</span>
 </div>`;
 const marked = new Marked();
-let studies;
+let currentData;
+let currentApiType = 'clinicaltrials';
+let llmConfig = null;
 
 const statusColor = {
   ACTIVE_NOT_RECRUITING: "#17a2b8",
@@ -40,6 +47,53 @@ const statusColor = {
   UNKNOWN: "#6c757d",
 };
 
+async function initializeLLMProvider() {
+  try {
+    llmConfig = await openaiConfig({
+      defaultBaseUrls: [ "https://llmfoundry.straive.com/openai/v1", "https://api.openai.com/v1"],
+      title: "Configure LLM Provider",
+      show: true
+    });
+  } catch (error) {
+    render(html`<div class="alert alert-danger"> Failed to configure LLM provider.</div>`, $error);
+  }
+}
+
+function updateAPISelector() {
+  const apiConfig = {
+    clinicaltrials: {
+      link: 'https://www.clinicaltrials.gov/data-api/api',
+      title: 'ClinicalTrials.gov API',
+      showDescription: $clinicalTrialsDescription,
+      hideDescription: $openfdaDescription,
+      demoClass: 'clinical-trials-demo'
+    },
+    openfda: {
+      link: 'https://open.fda.gov/apis/',
+      title: 'OpenFDA API',
+      showDescription: $openfdaDescription,
+      hideDescription: $clinicalTrialsDescription,
+      demoClass: 'openfda-demo'
+    }
+  };
+  document.querySelectorAll('.api-card').forEach(card => card.classList.remove('selected'));
+  document.querySelector(`.api-card[data-api="${currentApiType}"]`).classList.add('selected');
+  const config = apiConfig[currentApiType];
+  $apiSubtitle.innerHTML = `Answer questions from the <a href="${config.link}" id="api-link">${config.title}</a>`;
+  config.showDescription.style.display = 'block';
+  config.hideDescription.style.display = 'none';
+  document.querySelectorAll(`.${config.demoClass}`).forEach(el => el.style.display = 'block');
+  document.querySelectorAll(`.${currentApiType === 'clinicaltrials' ? 'openfda-demo' : 'clinical-trials-demo'}`).forEach(el => el.style.display = 'none');
+}
+
+document.querySelectorAll('.api-card').forEach(card => {
+  card.addEventListener('click', (e) => {
+    e.preventDefault();
+    currentApiType = card.dataset.api;
+    updateAPISelector();
+  });
+});
+
 document.querySelector("#demos").addEventListener("click", (e) => {
   const $demo = e.target.closest(".demo");
   if ($demo) {
@@ -49,48 +103,72 @@ document.querySelector("#demos").addEventListener("click", (e) => {
   }
 });
 
-$queryForm.addEventListener("submit", async (e) => {
-  e.preventDefault();
-  const query = $query.value;
-  render(spinner("Creating the Clinical Trials API query..."), $searchParams);
-  render("", $summary);
-  render("", $error);
-  let result;
-  for await (result of asyncLLM("https://llmfoundry.straive.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      stream: true,
-      messages: [
-        {
-          role: "system",
-          content: `
+const apiConfig = {
+  clinicaltrials: {
+    spinnerText: "Creating the Clinical Trials API query...",
+    systemContent: `
 Find studies that will have the most relevant answers to the user question.
 In query.*, don't use phrases as-is. Always identify the most relevant keywords, combining them with AND.
 E.g. "violation by the FDA" becomes "violation AND FDA".
 E.g. "improper adherence to safety and scientific integrity" becomes "adherence AND safety AND integrity"
 `.trim(),
-        },
-        { role: "user", content: query },
+    tool: tools.studies,
+    toolName: "studies",
+    searchFunction: runClinicalTrialsSearch
+  },
+  openfda: {
+    spinnerText: "Creating the OpenFDA API query...",
+    systemContent: `
+Find FDA drug data that will have the most relevant answers to the user question.
+For search queries, use proper OpenFDA syntax:
+- For multiple drugs, use "searches" array: ["openfda.brand_name:drug1", "openfda.brand_name:drug2"]
+- For single drug, use "search" string: "openfda.brand_name:drugname"
+- For exact phrase matching, use field:value
+- limit must be 10
+- For existence checks, use field:_exists_
+- For date ranges, use field:[YYYYMMDD+TO+YYYYMMDD]
+- Don't use phrases as-is. Always identify the most relevant keywords.
+`.trim(),
+    tool: tools.drugLabeling,
+    toolName: "drugLabeling",
+    searchFunction: runOpenFDASearch
+  }
+};
+
+$queryForm.addEventListener("submit", async (e) => {
+  e.preventDefault();
+  await handleApiQuery($query.value);
+});
+
+async function handleApiQuery(query) {
+  const config = apiConfig[currentApiType];
+  render(spinner(config.spinnerText), $searchParams);
+  render("", $summary);
+  render("", $error);
+  let result;
+  for await (result of asyncLLM(llmConfig.baseUrl + "/chat/completions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${llmConfig.apiKey}` },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      stream: true,
+      messages: [
+        { role: "system", content: config.systemContent },
+        { role: "user", content: query }
       ],
-      tools: [{ type: "function", function: tools.studies }],
-      tool_choice: { type: "function", function: { name: "studies" } },
-    }),
+      tools: [{ type: "function", function: config.tool }],
+      tool_choice: { type: "function", function: { name: config.toolName } }
+    })
   })) {
     if (result.args) drawSearchParams(parse(result.args));
     if (result.error) render(html`<div class="alert alert-danger">${result.error}</div>`, $error);
   }
-  await runSearch(parse(result.args));
+  
+  await config.searchFunction(result.name, parse(result.args));
   await similarity();
   await summarize();
-});
+}
 
-/**
- * Render the query as a key-value table
- * @param {Object} query
- */
 function drawSearchParams(query) {
   render(
     html`<table class="table">
@@ -105,7 +183,10 @@ function drawSearchParams(query) {
           ([k, v]) =>
             html`<tr>
               <td>${k}</td>
-              <td>${typeof v === "object" ? JSON.stringify(v) : v}</td>
+              <td>${Array.isArray(v) ? 
+                html`<ul class="mb-0">${v.map(item => html`<li>${item}</li>`)}</ul>` :
+                (typeof v === "object" ? JSON.stringify(v) : v)
+              }</td>
             </tr>`
         )}
       </tbody>
@@ -114,19 +195,35 @@ function drawSearchParams(query) {
   );
 }
 
-async function runSearch(args) {
+async function runClinicalTrialsSearch(args) {
   render(spinner("Searching the Clinical Trials API..."), $searchDocuments);
-  studies = (await api.studies(args)).studies;
-  console.log(studies);
-  renderStudies();
+  currentData = (await api.studies(args)).studies;
+  renderClinicalTrialsStudies();
 }
 
-function renderStudies({ nctIds, nodes } = {}) {
-  const renderedStudies = nodes && nodes.length ? nodes : studies;
+async function runOpenFDASearch(endpoint, args) {
+  render(spinner("Searching the OpenFDA API..."), $searchDocuments);
+  try {
+    const searchQueries = args.searches || (args.search ? [args.search] : []);
+    if (searchQueries.length === 0) { throw new Error("No search query provided"); }
+    const results = await Promise.all(searchQueries.map(async search => {
+      const response = await api.drugLabeling({ search, limit: args.limit || 10 });
+      return response.results?.map(item => ({ ...item, _searchQuery: search })) || [];
+    }));
+    currentData = results.flat();
+    renderOpenFDAResults(endpoint);
+  } catch (error) {
+    render(html`<div class="alert alert-danger">Error: ${error.message}</div>`, $searchDocuments);
+    currentData = [];
+  }
+}
+
+function renderClinicalTrialsStudies({ nctIds, nodes } = {}) {
+  const renderedStudies = nodes && nodes.length ? nodes : currentData;
   const study = renderedStudies[0];
   if (!study) return render(html`<div class="alert alert-warning">No studies found</div>`, $searchDocuments);
   nctIds = nctIds ?? [];
-
+  
   render(
     html`<div class="list-group">
       ${renderedStudies.slice(0, 10).map((study) => {
@@ -195,21 +292,91 @@ function renderStudies({ nctIds, nodes } = {}) {
   );
 }
 
+function renderOpenFDAResults(endpoint, { nodes } = {}) {
+  const renderedResults = nodes && nodes.length ? nodes : currentData;
+  if (!renderedResults || renderedResults.length === 0) {
+    return render(html`<div class="alert alert-warning">No results found</div>`, $searchDocuments);
+  }
+  render(
+    html`<div class="list-group">
+      ${renderedResults.slice(0, 10).map((result) => {
+        return renderDrugLabelingResult(result);
+      })}
+    </div>`,
+    $searchDocuments
+  );
+}
+
+function renderDrugLabelingResult(result) {
+  const brandName = result.openfda?.brand_name?.[0] || 'N/A';
+  const genericName = result.openfda?.generic_name?.[0] || 'N/A';
+  const manufacturerName = result.openfda?.manufacturer_name?.[0] || 'N/A';
+  const productType = result.openfda?.product_type?.[0] || 'N/A';
+  const ndcCodes = result.openfda?.product_ndc || [];
+  const nuiCodes = result.openfda?.nui || [];
+  return html`<div class="list-group-item">
+    <div class="mb-2">
+      <div class="fw-bold">${brandName} (${genericName})</div>
+      <span class="badge rounded-pill text-bg-primary">${productType}</span>
+      <div class="text-muted small">Manufacturer: ${manufacturerName}</div>
+      <div class="text-muted small">Search Query: ${result._searchQuery || 'N/A'}</div>
+    </div>
+    ${ndcCodes.length > 0 ? html`<details class="mb-2">
+      <summary>NDC Codes (${ndcCodes.length})</summary>
+      <ul class="mb-0">
+        ${ndcCodes.map(ndc => html`<li>${ndc}</li>`)}
+      </ul>
+    </details>` : null}
+    ${nuiCodes.length > 0 ? html`<details class="mb-2">
+      <summary>NUI Codes (${nuiCodes.length})</summary>
+      <ul class="mb-0">
+        ${nuiCodes.map(nui => html`<li>${nui}</li>`)}
+      </ul>
+    </details>` : null}
+    ${result.boxed_warning ? html`<details class="mb-2">
+      <summary class="text-danger fw-bold">⚠️ Boxed Warning</summary>
+      <div class="text-danger">${result.boxed_warning?.[0]}</div>
+    </details>` : null}
+    ${result.indications_and_usage ? html`<details class="mb-2">
+      <summary>Indications and Usage</summary>
+      ${result.indications_and_usage?.[0]}
+    </details>` : null}
+    ${result.contraindications ? html`<details class="mb-2">
+      <summary>Contraindications</summary>
+      ${result.contraindications?.[0]}
+    </details>` : null}
+    ${result.adverse_reactions ? html`<details class="mb-2">
+      <summary>Adverse Reactions</summary>
+      ${result.adverse_reactions?.[0]}
+    </details>` : null}
+  </div>`;
+}
+
 async function similarity() {
   $network.innerHTML = /* html */ `<div class="spinner-border text-primary ms-2" role="status"></div>`;
-
-  const docs = studies.map((study) => {
-    const briefTitle = study.protocolSection?.identificationModule?.briefTitle ?? "";
-    const officialTitle = study.protocolSection?.identificationModule?.officialTitle ?? "";
-    return `${briefTitle}\n${officialTitle}`;
-  });
-
+  let docs;
+  if (currentApiType === 'clinicaltrials') {
+    docs = currentData.map((study) => {
+      const briefTitle = study.protocolSection?.identificationModule?.briefTitle ?? "";
+      const officialTitle = study.protocolSection?.identificationModule?.officialTitle ?? "";
+      return `${briefTitle}\n${officialTitle}`;
+    });
+  } else {
+    docs = currentData.map((result) => {
+      const brandName = result.openfda?.brand_name?.[0] || '';
+      const genericName = result.openfda?.generic_name?.[0] || '';
+      const indications = result.indications_and_usage?.[0] || '';
+      return `${brandName} ${genericName}\n${indications}`;
+    });
+  }
   let similarityResults;
   try {
-    similarityResults = await fetch("https://llmfoundry.straive.com/similarity", {
+    similarityResults = await fetch(llmConfig.baseUrl.split('.com')[0] + '.com/similarity', {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
-      credentials: "include",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${llmConfig.apiKey}`
+      },
       body: JSON.stringify({ model: "text-embedding-3-small", docs }),
     }).then((r) => r.json());
   } catch (e) {
@@ -217,14 +384,13 @@ async function similarity() {
     $network.innerHTML = /* html */ `<div class="alert alert-danger">${e.message}</div>`;
     return;
   }
-
   $network.innerHTML = /* html */ `
     <input class="form-range" type="range" min="0" max="1" step="0.01" value="0.7" id="min-similarity" />
     <svg id="network-graph" width="600" height="600" class="img-fluid"></svg>
   `;
   const $minSimilarity = $network.querySelector("#min-similarity");
-
-  const nodes = [...studies];
+  const nodes = [...currentData];
+  
   function draw() {
     const links = [];
     const minSimilarity = +$minSimilarity.value;
@@ -237,11 +403,28 @@ async function similarity() {
       nodes,
       links,
       forces: { charge: () => d3.forceManyBody().strength(-200) },
-      brush: (nodes) => renderStudies({ nodes }),
+      brush: (nodes) => {
+        currentApiType === 'clinicaltrials' ? renderClinicalTrialsStudies({ nodes })
+              : renderOpenFDAResults('drugLabeling', { nodes });
+      },
       d3,
     });
     graph.nodes
-      .attr("fill", (d) => statusColor[d.protocolSection?.statusModule?.overallStatus] ?? "#888")
+      .attr("fill", (d) => {
+        if (currentApiType === 'clinicaltrials') {
+          return statusColor[d.protocolSection?.statusModule?.overallStatus] ?? "#888";
+        } else {
+              const route = d.openfda?.route?.[0];
+              const routeColors = {
+                'ORAL': statusColor.COMPLETED,
+                'INTRAVENOUS': statusColor.RECRUITING, 
+                'INTRAMUSCULAR': statusColor.ACTIVE_NOT_RECRUITING,
+                'TOPICAL': statusColor.NOT_YET_RECRUITING,
+                'SUBCUTANEOUS': statusColor.ENROLLING_BY_INVITATION
+              };
+              return routeColors[route] ?? "#007bff";
+        }
+      })
       .attr("stroke", "white")
       .attr("r", 10)
       .attr("data-bs-toggle", "tooltip");
@@ -252,24 +435,17 @@ async function similarity() {
 }
 
 async function summarize() {
-  render(spinner("Finding the most relevant results to the question..."), $summary);
+  const spinnerText = currentApiType === 'clinicaltrials' 
+    ? "Finding the most relevant results to the question..." 
+    : "Finding the most relevant FDA data to answer the question...";
+  render(spinner(spinnerText), $summary);
   let result;
   const query = $query.value;
-  for await (result of asyncLLM("https://llmfoundry.straive.com/openai/v1/chat/completions", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    credentials: "include",
-    body: JSON.stringify({
-      model: "gpt-4o-mini",
-      stream: true,
-      messages: [
-        { role: "system", content: "Find studies that will have the most relevant answers to the user question" },
-        { role: "user", content: query },
-        // #TODO: Send only relevant information?
-        { role: "assistant", content: JSON.stringify(studies.slice(0, 10), null, 2).slice(0, 500000) },
-        {
-          role: "user",
-          content: `
+  const systemPrompt = currentApiType === 'clinicaltrials'
+    ? "Find studies that will have the most relevant answers to the user question"
+    : "Find FDA drug data that will have the most relevant answers to the user question";
+  const userPrompt = currentApiType === 'clinicaltrials'
+    ? `
 Answer the user question ONLY using these studies, in one or two paragraphs.
 Highlight key words in **bold** so that just reading the bold words gives you the answer.
 Cite the relevant NCT IDs inline like this: [NCTnnnn](https://clinicaltrials.gov/study/NCTnnnn).
@@ -277,15 +453,39 @@ Cite the relevant NCT IDs inline like this: [NCTnnnn](https://clinicaltrials.gov
 Then list 1-line summaries of the studies with the most relevant snippet supporting the answer, like this:
 
 - [NCTnnnn](https://clinicaltrials.gov/study/NCTnnnn): [1-line summary of the study]
+`.trim()
+    : `
+Answer the user question ONLY using this FDA data, in one or two paragraphs.
+Highlight key words in **bold** so that just reading the bold words gives you the answer.
+Reference specific drug names and FDA findings inline.
+Then list 1-line summaries of the most relevant FDA records supporting the answer, like this:
+- **Drug Name**: [1-line summary of the FDA finding]
+`.trim();
 
-`.trim(),
-        },
+  const maxTokens = currentApiType === 'clinicaltrials' ? 500000 : 300000;
+  
+  for await (result of asyncLLM(llmConfig.baseUrl + "/chat/completions", {
+    method: "POST",
+    headers: { 
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${llmConfig.apiKey}`
+    },
+    body: JSON.stringify({
+      model: "gpt-4o-mini",
+      stream: true,
+      messages: [
+        { role: "system", content: systemPrompt },
+        { role: "user", content: query },
+        { role: "assistant", content: JSON.stringify(currentData.slice(0, 10), null, 2).slice(0, maxTokens) },
+        { role: "user", content: userPrompt },
       ],
     }),
   })) {
     if (result.content) render(unsafeHTML(marked.parse(result.content)), $summary);
     if (result.error) render(html`<div class="alert alert-danger">${result.error}</div>`, $error);
   }
-  // Make all links open in a new tab
   $summary.querySelectorAll("a").forEach((a) => a.setAttribute("target", "_blank"));
 }
+
+updateAPISelector();
+initializeLLMProvider();
