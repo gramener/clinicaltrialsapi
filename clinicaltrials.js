@@ -1,30 +1,38 @@
-const BASE = "https://clinicaltrials.gov/api/v2";
+const CLINICAL_TRIALS_BASE = "https://clinicaltrials.gov/api/v2";
+const OPENFDA_BASE = "https://api.fda.gov";
 
-async function run(path, params = {}) {
-  const url = `${BASE}${path}${params ? `?${new URLSearchParams(params)}` : ""}`;
+async function runAPI(baseUrl, path, params = {}) {
+  const url = `${baseUrl}${path}${params ? `?${new URLSearchParams(params)}` : ""}`;
   const res = await fetch(url);
   if (!res.ok) throw new Error(`API Error ${res.status}: ${await res.text()}`);
   return res.json();
 }
 
-function addFields(params) {
-  if (!params.fields) params.fields = [];
+async function runClinicalTrials(path, params = {}) {
+  return runAPI(CLINICAL_TRIALS_BASE, path, params);
+}
+async function runOpenFDA(path, params = {}) {return runAPI(OPENFDA_BASE, path, params); }
+
+function addFields(params = {}) {
+  const newParams = { ...params };
+  if (!newParams.fields) newParams.fields = [];
   for (const module of ["identificationModule", "statusModule"]) {
     const field = `protocolSection.${module}`;
-    if (!params.fields.includes(field)) params.fields.push(field);
+    if (!newParams.fields.includes(field)) newParams.fields.push(field);
   }
-  return params;
+  return newParams;
 }
 
 export const api = {
-  studies: (params) => run("/studies", { pageSize: 50, ...addFields(params) }),
-  study: ({ nctId }) => run(`/studies/${nctId}`),
-  studiesMetadata: () => run("/studies/metadata"),
-  studiesSearchAreas: () => run("/studies/search-areas"),
-  studiesEnums: () => run("/studies/enums"),
-  statsSize: (params) => run("/stats/size", params),
-  statsFieldValues: (params) => run("/stats/field/values", params),
-  statsFieldSizes: (params) => run("/stats/field/sizes", params),
+  studies: (params = {}) => runClinicalTrials("/studies", { pageSize: 50, ...addFields(params) }),
+  study: ({ nctId }) => runClinicalTrials(`/studies/${nctId}`),
+  studiesMetadata: () => runClinicalTrials("/studies/metadata"),
+  studiesSearchAreas: () => runClinicalTrials("/studies/search-areas"),
+  studiesEnums: () => runClinicalTrials("/studies/enums"),
+  statsSize: (params) => runClinicalTrials("/stats/size", params),
+  statsFieldValues: (params) => runClinicalTrials("/stats/field/values", params),
+  statsFieldSizes: (params) => runClinicalTrials("/stats/field/sizes", params),
+  drugLabeling: (params) => runOpenFDA("/drug/label.json", { limit: 10, ...params }),
 };
 
 export const tools = {
@@ -147,4 +155,31 @@ export const tools = {
       },
     },
   },
+  
+  // OpenFDA Tools
+  drugLabeling: {
+    name: "drugLabeling",
+    description: "Search FDA drug labeling data. For multiple drugs, combine ALL searches in a single 'searches' array. NEVER create multiple separate JSON objects.",
+    parameters: {
+      type: "object",
+      properties: {
+        searches: {
+          type: "array",
+          items: {
+            type: "string"
+          },
+          description: "Array of search queries for multiple drugs. Examples: ['openfda.brand_name:Stelara', 'openfda.brand_name:Tremfya']. Use this for multiple drugs in ONE array."
+        },
+        search: {
+          type: "string",
+          description: "Single search query for one drug only. Examples: 'openfda.brand_name:lipitor', 'boxed_warning:_exists_'. Use searches array for multiple drugs."
+        },
+        limit: {
+          type: "integer",
+          description: "Number of records to return per search (max 1000)",
+          default: 10
+        }
+      }
+    }
+  }
 };
